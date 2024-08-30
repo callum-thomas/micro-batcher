@@ -24,14 +24,26 @@ func main() {
 	}
 
 	strA := resA.Get()
-	strB := resB.Get()
+	if strA.err != nil {
+		panic(err)
+	}
 
-	fmt.Println(strA)
-	fmt.Println(strB)
+	strB := resB.Get()
+	if strA.err != nil {
+		panic(err)
+	}
+
+	fmt.Println(strA.output)
+	fmt.Println(strB.output)
 
 	b.Shutdown()
 }
 
-func processor(in string) string {
-	return strings.ToUpper(in)
+type Result struct {
+	output string
+	err    error
+}
+
+func processor(in string) *Result {
+	return &Result{output: strings.ToUpper(in), err: nil}
 }
