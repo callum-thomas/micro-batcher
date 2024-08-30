@@ -163,7 +163,6 @@ func TestBatcherShutdownClearsQueue(t *testing.T) {
 	b := NewBatcher(uppercaseString, FIVE_MINUTES, 2)
 
 	go b.Start()
-	defer b.Shutdown()
 
 	for i, job := range jobs {
 		_, err := b.AddJob(job)

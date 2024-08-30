@@ -27,6 +27,7 @@ func (jr *JobResult[B]) Get() B {
 	}
 
 	val := <-jr.ch
+	close(jr.ch)
 	jr.data = &val
 
 	return val
@@ -51,6 +52,8 @@ type Batcher[A any, B any] struct {
 	frequency time.Duration
 	// Status of Batcher shutdown.
 	shuttingDown bool
+	// Channel to signal when all remaining jobs are completed.
+	shutdownSignal chan bool
 	// Queue of jobs to be processed.
 	jobs []batchJob[A, B]
 	// Ticker to control time-based batch processing.
@@ -63,12 +66,13 @@ type Batcher[A any, B any] struct {
 // frequency and batch size.
 func NewBatcher[A any, B any](processor func(A) B, frequency time.Duration, batchSize int) *Batcher[A, B] {
 	return &Batcher[A, B]{
-		processor:    processor,
-		batchSize:    batchSize,
-		frequency:    frequency,
-		shuttingDown: false,
-		jobs:         []batchJob[A, B]{},
-		ticker:       time.NewTicker(frequency),
+		processor:      processor,
+		batchSize:      batchSize,
+		frequency:      frequency,
+		shuttingDown:   false,
+		shutdownSignal: make(chan bool, 1),
+		jobs:           []batchJob[A, B]{},
+		ticker:         time.NewTicker(frequency),
 	}
 }
 
@@ -111,6 +115,8 @@ func (b *Batcher[A, B]) Start() {
 				b.jobs = []batchJob[A, B]{}
 			}
 
+			b.shutdownSignal <- true
+
 			return
 		case len(b.jobs) >= b.batchSize:
 			b.mu.Lock()
@@ -136,6 +142,9 @@ func (b *Batcher[A, B]) Start() {
 // jobs from the queue before ceasing to process.
 func (b *Batcher[A, B]) Shutdown() {
 	b.shuttingDown = true
+
+	<-b.shutdownSignal
+	close(b.shutdownSignal)
 }
 
 func (b *Batcher[A, B]) startTicker() {
